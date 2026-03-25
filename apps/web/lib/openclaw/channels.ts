@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -28,16 +28,24 @@ function getCredentialsPath(accountName: string): string {
   );
 }
 
+function getCredentialsDir(accountName: string): string {
+  return path.dirname(getCredentialsPath(accountName));
+}
+
+async function hasWhatsAppAuthState(accountName: string): Promise<boolean> {
+  try {
+    await access(getCredentialsPath(accountName));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getWhatsAppStatus(): Promise<WhatsAppStatus> {
   const accountName = getWhatsAppAccountName();
-  const credsPath = getCredentialsPath(accountName);
+  const linked = await hasWhatsAppAuthState(accountName);
 
-  try {
-    await access(credsPath);
-    return { linked: true, accountName };
-  } catch {
-    return { linked: false, accountName };
-  }
+  return { linked, accountName };
 }
 
 export async function disconnectWhatsApp(): Promise<void> {
@@ -47,16 +55,42 @@ export async function disconnectWhatsApp(): Promise<void> {
   const args = [
     ...getOpenClawGlobalArgs(config),
     "channels",
-    "remove",
+    "logout",
     "--channel",
     "whatsapp",
     "--account",
     accountName,
-    "--delete",
   ];
 
-  await execFileAsync(config.bin, args, {
-    env: process.env,
-    timeout: 30_000,
+  let logoutError: unknown = null;
+
+  try {
+    await execFileAsync(config.bin, args, {
+      env: process.env,
+      timeout: 30_000,
+    });
+  } catch (error) {
+    logoutError = error;
+  }
+
+  if (!(await hasWhatsAppAuthState(accountName))) {
+    return;
+  }
+
+  await rm(getCredentialsDir(accountName), {
+    recursive: true,
+    force: true,
   });
+
+  if (!(await hasWhatsAppAuthState(accountName))) {
+    return;
+  }
+
+  if (logoutError instanceof Error) {
+    throw logoutError;
+  }
+
+  throw new Error(
+    `Falha ao limpar o estado autenticado do WhatsApp para a conta ${accountName}.`
+  );
 }

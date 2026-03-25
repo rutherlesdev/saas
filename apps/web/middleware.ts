@@ -13,6 +13,13 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // Guard against placeholder values (e.g. from template .env files)
+  try {
+    new URL(supabaseUrl);
+  } catch {
+    return response;
+  }
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {

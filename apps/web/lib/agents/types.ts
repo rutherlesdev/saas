@@ -38,5 +38,6 @@ export interface CreateAgentResult {
     mode: OpenClawSyncMode;
     state: "ready" | "pending" | "failed";
     error?: string | null;
+    jobId?: string;
   };
 }

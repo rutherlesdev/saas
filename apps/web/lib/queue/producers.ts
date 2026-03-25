@@ -14,6 +14,8 @@ import {
   DataExportJobData,
   WebhookJobData,
   CleanupJobData,
+  AgentProvisionJobData,
+  WhatsAppConnectJobData,
   validateJobData,
   EmailJobDataSchema,
   FileProcessingJobDataSchema,
@@ -364,6 +366,95 @@ export async function enqueueCleanup(
     correlationId,
     options?.idempotencyKey
   );
+
+  return job;
+}
+
+/**
+ * Enqueue agent provision job
+ */
+export async function enqueueAgentProvision(
+  data: AgentProvisionJobData,
+  options?: EnqueueOptions
+): Promise<Job<AgentProvisionJobData>> {
+  if (!validateJobData('agent_provision', data)) {
+    throw new Error('Invalid agent provision job data');
+  }
+
+  const queue = getQueue(QUEUE_NAMES.AGENT_PROVISION);
+  const correlationId = options?.correlationId || generateCorrelationId();
+  const idempotencyKey = options?.idempotencyKey || `agent-${data.agentId}`;
+
+  const existingJob = await checkIdempotency(idempotencyKey, QUEUE_NAMES.AGENT_PROVISION);
+  if (existingJob) {
+    getLogger().info({ msg: 'Agent provision job already exists (idempotent)', jobId: existingJob.id, correlationId });
+    return existingJob;
+  }
+
+  const job = await queue.add('provision-agent', data, {
+    jobId: buildIdempotentJobId(QUEUE_NAMES.AGENT_PROVISION, idempotencyKey),
+    attempts: options?.attempts || QUEUE_CONFIG.maxAttempts,
+    backoff: { type: 'exponential', delay: QUEUE_CONFIG.initialDelay },
+    delay: options?.delay,
+    priority: options?.priority,
+    removeOnComplete: QUEUE_CONFIG.removeOnComplete,
+    removeOnFail: QUEUE_CONFIG.removeOnFail,
+  });
+
+  await recordJobInSupabase(
+    job.id!,
+    QUEUE_NAMES.AGENT_PROVISION,
+    'agent_provision',
+    data,
+    data.userId,
+    correlationId,
+    idempotencyKey
+  );
+
+  getLogger().info({ msg: 'Agent provision job enqueued', jobId: job.id, agentId: data.agentId, correlationId });
+
+  return job;
+}
+
+/**
+ * Enqueue WhatsApp connect/disconnect job
+ */
+export async function enqueueWhatsAppConnect(
+  data: WhatsAppConnectJobData,
+  options?: EnqueueOptions
+): Promise<Job<WhatsAppConnectJobData>> {
+  if (!validateJobData('whatsapp_connect', data)) {
+    throw new Error('Invalid WhatsApp connect job data');
+  }
+
+  const queue = getQueue(QUEUE_NAMES.WHATSAPP_CONNECT);
+  const correlationId = options?.correlationId || generateCorrelationId();
+  const idempotencyKey =
+    options?.idempotencyKey ||
+    (data.event === 'disconnected'
+      ? `wa-disconnect-${data.userId}`
+      : `wa-connect-${data.userId}-${Date.now()}`);
+
+  const job = await queue.add('whatsapp-connect', data, {
+    jobId: buildIdempotentJobId(QUEUE_NAMES.WHATSAPP_CONNECT, idempotencyKey),
+    attempts: options?.attempts || QUEUE_CONFIG.maxAttempts,
+    backoff: { type: 'exponential', delay: QUEUE_CONFIG.initialDelay },
+    delay: options?.delay,
+    removeOnComplete: QUEUE_CONFIG.removeOnComplete,
+    removeOnFail: QUEUE_CONFIG.removeOnFail,
+  });
+
+  await recordJobInSupabase(
+    job.id!,
+    QUEUE_NAMES.WHATSAPP_CONNECT,
+    'whatsapp_connect',
+    data,
+    data.userId,
+    correlationId,
+    idempotencyKey
+  );
+
+  getLogger().info({ msg: 'WhatsApp connect job enqueued', jobId: job.id, event: data.event, correlationId });
 
   return job;
 }

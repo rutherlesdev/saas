@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { OpenClawSyncMode } from "@/lib/agents/types";
+import { useJobStatus } from "@/hooks/useJobStatus";
 import { Badge } from "@workspace/ui/components/badge";
 
 interface CreateAgentResponse {
@@ -26,6 +27,7 @@ interface CreateAgentResponse {
     mode: OpenClawSyncMode;
     state: "ready" | "pending" | "failed";
     error?: string | null;
+    jobId?: string;
   };
   error?: string;
 }
@@ -42,6 +44,27 @@ export function CreateAgentForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+
+  const { status: jobStatus } = useJobStatus(pendingJobId, {
+    pollInterval: 2000,
+    maxAttempts: 60,
+  });
+
+  useEffect(() => {
+    if (!jobStatus) return;
+    if (jobStatus.job.status === "completed") {
+      setSuccessMessage("Agente criado e provisionado no OpenClaw com sucesso.");
+      setPendingJobId(null);
+      startTransition(() => router.refresh());
+    } else if (jobStatus.job.status === "failed") {
+      setError("O provisionamento do agente falhou. Verifique os logs e tente novamente.");
+      setPendingJobId(null);
+      startTransition(() => router.refresh());
+    }
+  }, [jobStatus, router]);
+
+  const isProvisioning = pendingJobId !== null;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,9 +99,14 @@ export function CreateAgentForm({
           }`
         );
       } else if (payload.sync?.state === "pending") {
-        setSuccessMessage(
-          "Agente salvo. A sincronização com o OpenClaw ficou pendente para execução posterior."
-        );
+        if (payload.sync.mode === "immediate" && payload.sync.jobId) {
+          setSuccessMessage("Agente criado. Provisionando no OpenClaw…");
+          setPendingJobId(payload.sync.jobId);
+        } else {
+          setSuccessMessage(
+            "Agente salvo. Sincronização agendada para execução posterior."
+          );
+        }
       } else {
         setSuccessMessage(
           "Agente criado e provisionado no OpenClaw com workspace próprio."
@@ -162,14 +190,20 @@ export function CreateAgentForm({
 
           {successMessage ? (
             <Alert>
-              <AlertTitle>Agente registrado</AlertTitle>
+              <AlertTitle>
+                {isProvisioning ? "Provisionando…" : "Agente registrado"}
+              </AlertTitle>
               <AlertDescription>{successMessage}</AlertDescription>
             </Alert>
           ) : null}
 
           <div className="flex items-center justify-end">
-            <Button disabled={submitting} type="submit">
-              {submitting ? "Criando..." : "Criar agente"}
+            <Button disabled={submitting || isProvisioning} type="submit">
+              {submitting
+                ? "Criando..."
+                : isProvisioning
+                  ? "Provisionando…"
+                  : "Criar agente"}
             </Button>
           </div>
         </form>

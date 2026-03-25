@@ -14,6 +14,8 @@ import { validateRedisConnection } from './config';
 import { processEmailJob } from './workers/email-worker';
 import { processFileJob } from './workers/file-worker';
 import { processWebhookJob } from './workers/webhook-worker';
+import { processAgentProvisionJob } from './workers/agent-provision-worker';
+import { processWhatsAppConnectJob } from './workers/whatsapp-connect-worker';
 import { getLogger } from './observability/logger';
 import { checkWorkerHealth } from './health';
 
@@ -88,6 +90,9 @@ async function startWorkers() {
         return { cleaned: true };
       })
     );
+
+    workers.push(createWorker(QUEUE_NAMES.AGENT_PROVISION, processAgentProvisionJob));
+    workers.push(createWorker(QUEUE_NAMES.WHATSAPP_CONNECT, processWhatsAppConnectJob));
 
     logger.info({ workerCount: workers.length }, 'All workers started');
 

@@ -15,8 +15,10 @@ import {
 } from "@/lib/agents/utils";
 import { withSpan } from "@/lib/observability/tracing";
 import { getLogger } from "@/lib/queue/observability/logger";
+import { generateCorrelationId } from "@/lib/queue/observability/correlation";
 import { getOpenClawConfig } from "@/lib/openclaw/config";
-import { provisionOpenClawAgent } from "@/lib/openclaw/agents";
+import { getWhatsAppStatus } from "@/lib/openclaw/channels";
+import { enqueueAgentProvision } from "@/lib/queue/producers";
 
 const logger = getLogger();
 
@@ -158,84 +160,35 @@ export async function createAgent(
       };
     }
 
-    try {
-      const provisioned = await provisionOpenClawAgent({
-        agentId: openClawAgentId,
+    const correlationId = generateCorrelationId();
+    const waStatus = await getWhatsAppStatus();
+
+    const provisionJob = await enqueueAgentProvision(
+      {
+        agentId: agent.id,
+        userId,
+        openClawAgentId,
         displayName: input.name,
         workspacePath,
         agentDirPath,
-      });
+        correlationId,
+        whatsappAccount: waStatus.linked ? waStatus.accountName : undefined,
+      },
+      { idempotencyKey: `agent-${agent.id}`, correlationId }
+    );
 
-      const nextMetadata = {
-        ...(agent.metadata_json || {}),
-        openclaw: {
-          ...((agent.metadata_json as Record<string, unknown> | null)?.openclaw as
-            | Record<string, unknown>
-            | undefined),
-          provisionedAt: new Date().toISOString(),
-          identityApplied: provisioned.identityApplied,
-          identityWarning: provisioned.identityWarning || null,
-        },
-      } as Record<string, unknown>;
+    logger.info(
+      { agentId: agent.id, openClawAgentId, correlationId, jobId: provisionJob.id },
+      "Agent provision job enqueued"
+    );
 
-      agent = await updateAgentRecord(supabase, agent.id, {
-        status: "ready",
-        metadata_json: nextMetadata,
-      });
-
-      logger.info(
-        {
-          agentId: agent.id,
-          openClawAgentId,
-          workspacePath,
-        },
-        "Agent provisioned in OpenClaw"
-      );
-
-      return {
-        agent,
-        sync: {
-          mode: "immediate",
-          state: "ready",
-        },
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to provision agent";
-
-      logger.error(
-        {
-          agentId: agent.id,
-          openClawAgentId,
-          error: errorMessage,
-        },
-        "OpenClaw provisioning failed; agent kept for retry"
-      );
-
-      const nextMetadata = {
-        ...(agent.metadata_json || {}),
-        openclaw: {
-          ...((agent.metadata_json as Record<string, unknown> | null)?.openclaw as
-            | Record<string, unknown>
-            | undefined),
-          lastError: errorMessage,
-          failedAt: new Date().toISOString(),
-        },
-      } as Record<string, unknown>;
-
-      agent = await updateAgentRecord(supabase, agent.id, {
-        status: "sync_failed",
-        metadata_json: nextMetadata,
-      });
-
-      return {
-        agent,
-        sync: {
-          mode: "immediate",
-          state: "failed",
-          error: errorMessage,
-        },
-      };
-    }
+    return {
+      agent,
+      sync: {
+        mode: "immediate",
+        state: "pending",
+        jobId: provisionJob.id,
+      },
+    };
   });
 }

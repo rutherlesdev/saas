@@ -20,9 +20,11 @@ export function getOpenClawConfig(): OpenClawConfig {
     model: process.env.OPENCLAW_MODEL?.trim() || undefined,
     syncMode,
     workspacesRoot:
-      process.env.OPENCLAW_WORKSPACES_ROOT || "/data/openclaw/workspaces",
+      process.env.OPENCLAW_WORKSPACES_ROOT ||
+      `${process.env.HOME || "/home/openclaw"}/.openclaw/workspaces`,
     agentStateRoot:
-      process.env.OPENCLAW_AGENT_STATE_ROOT || "/data/openclaw/agents",
+      process.env.OPENCLAW_AGENT_STATE_ROOT ||
+      `${process.env.HOME || "/home/openclaw"}/.openclaw/agents`,
     timeoutMs: Number(process.env.OPENCLAW_TIMEOUT_MS || 30_000),
   };
 }

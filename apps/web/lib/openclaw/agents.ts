@@ -62,6 +62,33 @@ async function runOpenClawJsonCommand<T>(args: string[]) {
   return extractJsonPayload<T>(combinedOutput);
 }
 
+/**
+ * Bind an agent to a channel account.
+ * Equivalent to: openclaw agents bind --agent {agentId} --bind {channel}:{accountName}
+ */
+export async function bindAgentToChannel(
+  agentId: string,
+  channel: string,
+  accountName: string
+): Promise<void> {
+  const config = getOpenClawConfig();
+  const args = [
+    ...getOpenClawGlobalArgs(config),
+    "agents",
+    "bind",
+    "--agent",
+    agentId,
+    "--bind",
+    `${channel}:${accountName}`,
+  ];
+
+  await execFileAsync(config.bin, args, {
+    env: process.env,
+    maxBuffer: 1024 * 1024,
+    timeout: config.timeoutMs,
+  });
+}
+
 export async function provisionOpenClawAgent(
   input: ProvisionOpenClawAgentInput
 ): Promise<ProvisionOpenClawAgentResult> {

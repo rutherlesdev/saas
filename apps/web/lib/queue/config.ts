@@ -61,6 +61,8 @@ export const QUEUE_NAMES = {
   DATA_EXPORT: 'data-export-queue',
   WEBHOOK: 'webhook-queue',
   CLEANUP: 'cleanup-queue',
+  AGENT_PROVISION: 'agent-provision-queue',
+  WHATSAPP_CONNECT: 'whatsapp-connect-queue',
 } as const;
 
 /**

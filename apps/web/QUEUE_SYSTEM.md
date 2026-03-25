@@ -80,7 +80,9 @@ lib/queue/
     ├── worker.ts                      # Main worker startup
     ├── email-worker.ts                # Email job processor
     ├── file-worker.ts                 # File processing processor
-    └── webhook-worker.ts              # Webhook delivery processor
+    ├── webhook-worker.ts              # Webhook delivery processor
+    ├── agent-provision-worker.ts      # Agent provisioning (OpenClaw CLI + Supabase)
+    └── whatsapp-connect-worker.ts     # WhatsApp connect/disconnect side-effects
 app/api/
 ├── jobs/
 │   ├── enqueue/route.ts               # POST endpoint to enqueue jobs
@@ -151,23 +153,48 @@ This creates:
 
 ### 4. Configure Environment Variables
 
-Copy to `.env.local`:
+O worker usa **dois arquivos** de variáveis de ambiente:
+
+| Arquivo | Conteúdo | Carregado por |
+|---------|----------|---------------|
+| `.env.local` | Supabase + OpenClaw + Sentry | `next dev` e `dev:worker` |
+| `.env.queue` | Redis + concurrency + logging + Supabase (espelho) | `dev:worker` |
+
+#### Preencher o `.env.queue` com a Supabase CLI
 
 ```bash
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
+# Listar projetos e obter o reference ID
+npx supabase projects list
 
-# Supabase (get from dashboard)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Queue
-QUEUE_CONCURRENCY=10
-LOG_LEVEL=debug
+# Buscar as chaves do projeto
+npx supabase projects api-keys --project-ref <REFERENCE_ID>
 ```
+
+Cole os valores nas linhas correspondentes de `.env.queue`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+```
+
+> **Atenção:** `.env.queue` é um espelho das chaves Supabase de `.env.local`.
+> Se rotacionar as chaves no dashboard, atualize **ambos** os arquivos.
+
+#### Aviso de produção — `start:worker`
+
+```jsonc
+// package.json
+"dev:worker":   "node --env-file=.env.local --env-file=.env.queue ...",  // ✅ carrega env
+"start:worker": "node --import tsx/esm ./lib/queue/worker.ts"            // ⚠️ não carrega env
+```
+
+O script `start:worker` não usa `--env-file`. Em produção, as variáveis precisam
+estar no ambiente do processo — via systemd `EnvironmentFile=`, Docker `--env-file`,
+variáveis injetadas pela plataforma (Railway, Fly, etc.), ou similar.
+
+Se `NEXT_PUBLIC_SUPABASE_URL` ou `SUPABASE_SERVICE_ROLE_KEY` estiverem ausentes,
+`lib/supabase-admin.ts` lança um erro na inicialização e o worker não sobe.
 
 ## Running
 
@@ -557,6 +584,39 @@ QUEUE_CONFIG = {
 ```
 
 ## Troubleshooting
+
+### Jobs completados no BullMQ mas status "queued" no Supabase
+
+**Causa:** O cliente Supabase JS **nunca lança exceções** para erros de banco de dados —
+ele retorna `{ data, error }`. Um `await supabase.from(...).update(...)` sem verificar
+`error` descarta silenciosamente qualquer falha (permissão negada, RLS, coluna inexistente, etc.).
+
+Da mesma forma, `.update().eq('id', x)` que não encontra nenhuma linha retorna
+`{ data: null, error: null }` — sem erro, mas sem atualização.
+
+**Padrão correto para writes críticos:**
+
+```ts
+const { data: updated, error } = await supabaseAdmin
+  .from('agents')
+  .update({ status: 'ready' })
+  .eq('id', agentId)
+  .select();          // ← necessário para detectar 0 rows matched
+
+if (error) throw new Error(`Supabase update failed: ${error.message}`);
+if (!updated?.length) throw new Error(`Agent ${agentId} not found`);
+```
+
+**Para writes de auditoria (jobs, job_events) — log sem throw:**
+
+```ts
+const { error } = await supabaseAdmin.from('jobs').update({ status: 'completed' }).eq('id', id);
+if (error) logger.warn({ error: error.message }, 'Failed to update job record');
+```
+
+**Diagnóstico rápido:** cada worker escreve `status: 'processing'` e `started_at` logo
+no início. Se o registro Supabase permanecer `queued` após BullMQ completar o job,
+o worker não consegue se comunicar com o Supabase — verifique as env vars e os logs.
 
 ### "Redis connection failed"
 

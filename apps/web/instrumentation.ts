@@ -1,14 +1,26 @@
 /**
  * Next.js Instrumentation
  *
- * Initializes OpenTelemetry (Node.js runtime) and Sentry (all runtimes).
+ * Initializes OpenTelemetry (Node.js runtime) and Sentry (server/edge runtimes).
  * Called once at server startup by the Next.js runtime.
  *
  * Docs: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 
+import { getServerSentryDsn } from './lib/observability/sentry-config';
+
+let otelStarted = false;
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    if (getServerSentryDsn()) {
+      await import('./sentry.server.config');
+    }
+
+    if (otelStarted) {
+      return;
+    }
+
     const { NodeSDK } = await import('@opentelemetry/sdk-node');
     const { getNodeAutoInstrumentations } = await import(
       '@opentelemetry/auto-instrumentations-node'
@@ -44,17 +56,13 @@ export async function register() {
       ],
     });
 
-    sdk.start();
+    await sdk.start();
+    otelStarted = true;
+    return;
   }
 
-  // Sentry runs on both nodejs and edge runtimes
-  if (process.env.SENTRY_DSN) {
-    const Sentry = await import('@sentry/nextjs');
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
-      environment: process.env.NODE_ENV ?? 'development',
-    });
+  if (process.env.NEXT_RUNTIME === 'edge' && getServerSentryDsn()) {
+    await import('./sentry.edge.config');
   }
 }
 
@@ -64,6 +72,10 @@ export async function onRequestError(
   request: { path: string; method: string; headers: Record<string, string | string[] | undefined> },
   context: { routerKind: string; routePath: string; routeType: string }
 ) {
+  if (!getServerSentryDsn()) {
+    return;
+  }
+
   const Sentry = await import('@sentry/nextjs');
   Sentry.captureRequestError(err, request, context);
 }

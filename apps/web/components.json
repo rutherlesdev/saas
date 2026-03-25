@@ -6,18 +6,19 @@
   "tailwind": {
     "config": "",
     "css": "../../packages/ui/src/styles/globals.css",
-    "baseColor": "neutral",
+    "baseColor": "zinc",
     "cssVariables": true
   },
-  "iconLibrary": "lucide",
+  "iconLibrary": "hugeicons",
+  "rtl": false,
   "aliases": {
     "components": "@/components",
-    "hooks": "@/hooks",
-    "lib": "@/lib",
     "utils": "@workspace/ui/lib/utils",
-    "ui": "@workspace/ui/components"
+    "ui": "@workspace/ui/components",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
   },
-  "rtl": false,
   "menuColor": "default",
-  "menuAccent": "subtle"
+  "menuAccent": "subtle",
+  "registries": {}
 }

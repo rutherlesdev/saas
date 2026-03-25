@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@workspace/ui/components/sidebar"
-import { LayoutDashboardIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { LayoutDashboardIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageCircleIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -37,6 +37,14 @@ const data = {
       url: "/dashboard/agents",
       icon: (
         <BotIcon
+        />
+      ),
+    },
+    {
+      title: "WhatsApp",
+      url: "/dashboard/whatsapp",
+      icon: (
+        <MessageCircleIcon
         />
       ),
     },
@@ -153,7 +161,7 @@ const data = {
 }
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

@@ -97,6 +97,46 @@ export interface WebhookJobResult {
 }
 
 /**
+ * Agent Provision Job - for async OpenClaw agent provisioning
+ */
+export const AgentProvisionJobDataSchema = JobCorrelationSchema.extend({
+  agentId: z.string().uuid('Invalid agent ID'),
+  userId: z.string(),
+  openClawAgentId: z.string(),
+  displayName: z.string().min(1),
+  workspacePath: z.string(),
+  agentDirPath: z.string(),
+  whatsappAccount: z.string().optional(),
+});
+
+export type AgentProvisionJobData = z.input<typeof AgentProvisionJobDataSchema>;
+
+export interface AgentProvisionJobResult {
+  agentId: string;
+  openClawAgentId: string;
+  identityApplied: boolean;
+  provisionedAt: number;
+}
+
+/**
+ * WhatsApp Connect Job - for async post-connection/disconnection side-effects
+ */
+export const WhatsAppConnectJobDataSchema = JobCorrelationSchema.extend({
+  userId: z.string(),
+  accountName: z.string(),
+  event: z.enum(['connected', 'disconnected']),
+  triggeredBy: z.string().optional(),
+});
+
+export type WhatsAppConnectJobData = z.input<typeof WhatsAppConnectJobDataSchema>;
+
+export interface WhatsAppConnectJobResult {
+  accountName: string;
+  event: 'connected' | 'disconnected';
+  recordedAt: number;
+}
+
+/**
  * Cleanup Job - for periodic maintenance tasks
  */
 export const CleanupJobDataSchema = JobCorrelationSchema.extend({
@@ -176,6 +216,8 @@ export function getJobValidator(jobType: string) {
     data_export: DataExportJobDataSchema,
     webhook: WebhookJobDataSchema,
     cleanup: CleanupJobDataSchema,
+    agent_provision: AgentProvisionJobDataSchema,
+    whatsapp_connect: WhatsAppConnectJobDataSchema,
   };
 
   return validators[jobType];

@@ -21,6 +21,12 @@ export const REDIS_CONFIG = {
   },
 } as const;
 
+export const QUEUE_PREFIX =
+  process.env.QUEUE_PREFIX ||
+  (process.env.NODE_ENV === 'test' && process.env.VITEST_WORKER_ID
+    ? `saas-test-${process.env.VITEST_WORKER_ID}`
+    : 'bull');
+
 export const QUEUE_CONFIG = {
   // Worker configuration
   concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '10', 10),

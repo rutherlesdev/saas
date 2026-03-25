@@ -9,7 +9,7 @@
 
 import { Worker } from 'bullmq';
 import { getRedisConnection, getQueue, getQueueEvents, shutdownQueues } from './client';
-import { QUEUE_NAMES, QUEUE_CONFIG } from './config';
+import { QUEUE_NAMES, QUEUE_CONFIG, QUEUE_PREFIX } from './config';
 import { validateRedisConnection } from './config';
 import { processEmailJob } from './workers/email-worker';
 import { processFileJob } from './workers/file-worker';
@@ -31,6 +31,7 @@ function createWorker(
 ) {
   const worker = new Worker(queueName, processor, {
     connection: getRedisConnection(),
+    prefix: QUEUE_PREFIX,
     concurrency: QUEUE_CONFIG.concurrency,
     settings: {
       maxStalledCount: QUEUE_CONFIG.maxStalledCount,

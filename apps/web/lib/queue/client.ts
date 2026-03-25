@@ -7,7 +7,7 @@
 
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
-import { REDIS_CONFIG, QUEUE_NAMES } from './config';
+import { REDIS_CONFIG, QUEUE_NAMES, QUEUE_PREFIX } from './config';
 
 type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
@@ -58,6 +58,7 @@ export function getQueue(queueName: QueueName): Queue {
   if (!queues.has(queueName)) {
     const queue = new Queue(queueName, {
       connection: getRedisConnection(),
+      prefix: QUEUE_PREFIX,
       settings: {
         maxStalledCount: 2,
         lockDuration: 30000,
@@ -78,6 +79,7 @@ export function getQueueEvents(queueName: QueueName): QueueEvents {
   if (!queueEvents.has(queueName)) {
     const events = new QueueEvents(queueName, {
       connection: getRedisSubscriber(),
+      prefix: QUEUE_PREFIX,
     });
     
     queueEvents.set(queueName, events);
@@ -123,5 +125,31 @@ export async function shutdownQueues(): Promise<void> {
  * Reset for testing purposes
  */
 export async function resetQueues(): Promise<void> {
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      const redis = getRedisConnection();
+      await redis.flushdb();
+    } finally {
+      await shutdownQueues();
+    }
+
+    return;
+  }
+
+  const queueInstances = Object.values(QUEUE_NAMES).map((queueName) =>
+    getQueue(queueName)
+  );
+
+  await Promise.all(
+    queueInstances.map(async (queue) => {
+      try {
+        await queue.pause();
+        await queue.obliterate({ force: true });
+      } catch (error) {
+        console.warn(`Failed to obliterate queue ${queue.name}:`, error);
+      }
+    })
+  );
+
   await shutdownQueues();
 }

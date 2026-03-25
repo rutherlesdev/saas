@@ -2,13 +2,13 @@
  * Job Producers Tests
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  enqueueEmail,
-  enqueueFileProcessing,
-  enqueueWebhook,
-} from '@/lib/queue/producers';
-import { resetQueues } from '@/lib/queue/client';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import type { Job } from 'bullmq';
+import type {
+  EmailJobData,
+  FileProcessingJobData,
+  WebhookJobData,
+} from '@/lib/queue/jobs';
 
 // Mock Supabase
 vi.mock('@/lib/supabase-admin', () => ({
@@ -24,6 +24,32 @@ vi.mock('@/lib/supabase-admin', () => ({
 }));
 
 describe('Job Producers', () => {
+  let enqueueEmail: (
+    data: EmailJobData,
+    options?: Record<string, unknown>
+  ) => Promise<Job<EmailJobData>>;
+  let enqueueFileProcessing: (
+    data: FileProcessingJobData,
+    options?: Record<string, unknown>
+  ) => Promise<Job<FileProcessingJobData>>;
+  let enqueueWebhook: (
+    data: WebhookJobData,
+    options?: Record<string, unknown>
+  ) => Promise<Job<WebhookJobData>>;
+  let resetQueues: () => Promise<void>;
+
+  beforeAll(async () => {
+    process.env.REDIS_DB = '11';
+    process.env.QUEUE_PREFIX = 'saas-queue-producers-tests';
+
+    vi.resetModules();
+
+    ({ enqueueEmail, enqueueFileProcessing, enqueueWebhook } = await import(
+      '@/lib/queue/producers'
+    ));
+    ({ resetQueues } = await import('@/lib/queue/client'));
+  });
+
   beforeEach(async () => {
     await resetQueues();
   });

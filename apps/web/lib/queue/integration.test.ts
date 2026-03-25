@@ -4,10 +4,9 @@
  * Tests job flow from enqueue to completion
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { enqueueEmail, enqueueWebhook } from '@/lib/queue/producers';
-import { getQueue, resetQueues } from '@/lib/queue/client';
-import { QUEUE_NAMES } from '@/lib/queue/config';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import type { Job } from 'bullmq';
+import type { EmailJobData, WebhookJobData } from '@/lib/queue/jobs';
 
 // Mock Supabase
 vi.mock('@/lib/supabase-admin', () => ({
@@ -25,6 +24,29 @@ vi.mock('@/lib/supabase-admin', () => ({
 }));
 
 describe('Integration Tests', () => {
+  let enqueueEmail: (
+    data: EmailJobData,
+    options?: Record<string, unknown>
+  ) => Promise<Job<EmailJobData>>;
+  let enqueueWebhook: (
+    data: WebhookJobData,
+    options?: Record<string, unknown>
+  ) => Promise<Job<WebhookJobData>>;
+  let getQueue: (queueName: string) => any;
+  let resetQueues: () => Promise<void>;
+  let QUEUE_NAMES: Record<string, string>;
+
+  beforeAll(async () => {
+    process.env.REDIS_DB = '10';
+    process.env.QUEUE_PREFIX = 'saas-queue-integration-tests';
+
+    vi.resetModules();
+
+    ({ enqueueEmail, enqueueWebhook } = await import('@/lib/queue/producers'));
+    ({ getQueue, resetQueues } = await import('@/lib/queue/client'));
+    ({ QUEUE_NAMES } = await import('@/lib/queue/config'));
+  });
+
   beforeEach(async () => {
     await resetQueues();
   });

@@ -33,6 +33,10 @@ interface EnqueueOptions {
   attempts?: number;
 }
 
+function buildIdempotentJobId(queueName: string, idempotencyKey: string) {
+  return `${queueName}:idempotent:${idempotencyKey}`;
+}
+
 /**
  * Store job metadata in Supabase for audit trail
  */
@@ -78,6 +82,15 @@ async function checkIdempotency(
   idempotencyKey: string,
   queueName: string
 ): Promise<Job | null> {
+  const queue = getQueue(queueName as any);
+  const existingQueueJob = await queue.getJob(
+    buildIdempotentJobId(queueName, idempotencyKey)
+  );
+
+  if (existingQueueJob) {
+    return existingQueueJob;
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('jobs')
@@ -89,7 +102,6 @@ async function checkIdempotency(
 
     if (!error && data) {
       // Return existing job to caller
-      const queue = getQueue(queueName as any);
       return queue.getJob(data.id);
     }
   } catch (error) {
@@ -130,6 +142,9 @@ export async function enqueueEmail(
   }
 
   const job = await queue.add('send-email', data, {
+    jobId: options?.idempotencyKey
+      ? buildIdempotentJobId(QUEUE_NAMES.EMAIL, options.idempotencyKey)
+      : undefined,
     attempts: options?.attempts || QUEUE_CONFIG.maxAttempts,
     backoff: {
       type: 'exponential',
@@ -186,6 +201,9 @@ export async function enqueueFileProcessing(
   }
 
   const job = await queue.add('process-file', data, {
+    jobId: options?.idempotencyKey
+      ? buildIdempotentJobId(QUEUE_NAMES.FILE_PROCESSING, options.idempotencyKey)
+      : undefined,
     attempts: options?.attempts || QUEUE_CONFIG.maxAttempts,
     backoff: {
       type: 'exponential',
@@ -235,6 +253,9 @@ export async function enqueueDataExport(
   }
 
   const job = await queue.add('export-data', data, {
+    jobId: options?.idempotencyKey
+      ? buildIdempotentJobId(QUEUE_NAMES.DATA_EXPORT, options.idempotencyKey)
+      : undefined,
     attempts: options?.attempts || 1, // No retries for exports
     delay: options?.delay,
     priority: options?.priority || 5, // Lower priority export
@@ -278,6 +299,9 @@ export async function enqueueWebhook(
   }
 
   const job = await queue.add('deliver-webhook', data, {
+    jobId: options?.idempotencyKey
+      ? buildIdempotentJobId(QUEUE_NAMES.WEBHOOK, options.idempotencyKey)
+      : undefined,
     attempts: options?.attempts || QUEUE_CONFIG.maxAttempts,
     backoff: {
       type: 'exponential',

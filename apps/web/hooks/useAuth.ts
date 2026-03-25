@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { buildEmailRedirectTo } from "@/lib/auth/redirects";
 import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -40,9 +41,19 @@ export function useAuth() {
     setLoading(true);
     setError(null);
     try {
+      const emailRedirectTo =
+        typeof window === "undefined"
+          ? undefined
+          : buildEmailRedirectTo(window.location.origin);
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: emailRedirectTo
+          ? {
+              emailRedirectTo,
+            }
+          : undefined,
       });
       if (error) throw error;
       return data;

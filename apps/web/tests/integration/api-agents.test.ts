@@ -130,4 +130,17 @@ describe("POST /api/agents", () => {
     const response = await POST(makeRequest({ name: "Agente Suporte" }));
     expect(response.status).toBe(409);
   });
+
+  it("returns 503 when the agents table migration has not been applied", async () => {
+    mocks.createAgent.mockRejectedValue({
+      code: "PGRST205",
+      message: "Could not find the table 'public.agents' in the schema cache",
+    });
+
+    const response = await POST(makeRequest({ name: "Agente Suporte" }));
+    expect(response.status).toBe(503);
+
+    const body = await response.json();
+    expect(body.error).toContain("public.agents");
+  });
 });

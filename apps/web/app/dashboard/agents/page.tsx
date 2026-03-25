@@ -6,6 +6,10 @@ import { AgentsTable } from "@/components/agents/agents-table";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import type { AgentRecord } from "@/lib/agents/types";
+import {
+  getMissingAgentsTableMessage,
+  isMissingAgentsTableError,
+} from "@/lib/agents/supabase-errors";
 import { getOpenClawConfig } from "@/lib/openclaw/config";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,13 +33,14 @@ export default async function AgentsDashboardPage() {
     .from("agents")
     .select("*")
     .order("created_at", { ascending: false });
+  const missingAgentsTable = isMissingAgentsTableError(error);
 
-  if (error) {
+  if (error && !missingAgentsTable) {
     throw new Error(error.message);
   }
 
   const config = getOpenClawConfig();
-  const agents = (data || []) as AgentRecord[];
+  const agents = missingAgentsTable ? [] : ((data || []) as AgentRecord[]);
 
   return (
     <SidebarProvider
@@ -91,8 +96,41 @@ export default async function AgentsDashboardPage() {
               </div>
 
               <div className="grid gap-4 px-4 lg:px-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-                <CreateAgentForm syncMode={config.syncMode} />
-                <AgentsTable agents={agents} />
+                {missingAgentsTable ? (
+                  <Card className="xl:col-span-2">
+                    <CardContent className="flex flex-col gap-4 py-6">
+                      <div className="space-y-1">
+                        <h3 className="text-base font-semibold">
+                          Schema do Supabase pendente
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Esta tela depende da tabela `public.agents`, mas o
+                          banco configurado para este ambiente ainda nao recebeu
+                          a migration correspondente.
+                        </p>
+                      </div>
+
+                      <Alert variant="destructive">
+                        <AlertTitle>Migration necessaria</AlertTitle>
+                        <AlertDescription>
+                          {getMissingAgentsTableMessage()}
+                        </AlertDescription>
+                      </Alert>
+
+                      <p className="text-sm text-muted-foreground">
+                        Aplique a migration do Supabase que cria
+                        `public.agents` e recarregue a pagina. Depois disso, a
+                        listagem e a criacao de agentes voltam a funcionar
+                        normalmente.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    <CreateAgentForm syncMode={config.syncMode} />
+                    <AgentsTable agents={agents} />
+                  </>
+                )}
               </div>
             </div>
           </div>

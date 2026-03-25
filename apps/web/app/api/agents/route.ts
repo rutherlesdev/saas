@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAgentSchema } from "@/lib/agents/schema";
+import {
+  getMissingAgentsTableMessage,
+  isMissingAgentsTableError,
+} from "@/lib/agents/supabase-errors";
 import { withSpan } from "@/lib/observability/tracing";
 import {
   clearCorrelationId,
@@ -98,6 +102,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Falha ao criar agente";
+    const missingAgentsTable = isMissingAgentsTableError(error);
+    const conflictError = isConflictError(error);
 
     logger.error(
       { correlationId, error: errorMessage },
@@ -105,9 +111,15 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json(
-      { error: isConflictError(error) ? "Já existe um agente com esse identificador" : errorMessage },
       {
-        status: isConflictError(error) ? 409 : 500,
+        error: missingAgentsTable
+          ? getMissingAgentsTableMessage()
+          : conflictError
+            ? "Já existe um agente com esse identificador"
+            : errorMessage,
+      },
+      {
+        status: missingAgentsTable ? 503 : conflictError ? 409 : 500,
         headers: { "x-correlation-id": correlationId },
       }
     );

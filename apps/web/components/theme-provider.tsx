@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
+import { matchesThemeHotkey } from "@/lib/theme/hotkeys"
 
 function ThemeProvider({
   children,
@@ -22,7 +23,7 @@ function ThemeProvider({
 }
 
 function isTypingTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
     return false
   }
 
@@ -39,15 +40,7 @@ function ThemeHotkey() {
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.repeat) {
-        return
-      }
-
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        return
-      }
-
-      if (event.key.toLowerCase() !== "d") {
+      if (!matchesThemeHotkey(event)) {
         return
       }
 

@@ -32,7 +32,7 @@ describe('Integration Tests', () => {
     data: WebhookJobData,
     options?: Record<string, unknown>
   ) => Promise<Job<WebhookJobData>>;
-  let getQueue: (queueName: string) => any;
+  let getQueue: (...args: any[]) => any;
   let resetQueues: () => Promise<void>;
   let QUEUE_NAMES: Record<string, string>;
 
@@ -66,14 +66,15 @@ describe('Integration Tests', () => {
     const job = await enqueueEmail(emailData);
 
     expect(job.id).toBeDefined();
-    expect(job.data).toEqual(emailData);
+    expect(job.data).toMatchObject(emailData);
 
     // Job should be in queue
     const queue = getQueue(QUEUE_NAMES.EMAIL);
-    const jobFromQueue = await queue.getJob(job.id!);
+    const jobId = String(job.id);
+    const jobFromQueue = await queue.getJob(jobId);
 
     expect(jobFromQueue).toBeDefined();
-    expect(jobFromQueue?.data).toEqual(emailData);
+    expect(jobFromQueue?.data).toMatchObject(emailData);
   });
 
   it('should handle concurrent job submissions', async () => {

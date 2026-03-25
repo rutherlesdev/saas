@@ -5,7 +5,7 @@
  * idempotency handling, and correlation ID tracking.
  */
 
-import { Queue, Job } from 'bullmq';
+import { Job } from 'bullmq';
 import { getQueue } from './client';
 import { QUEUE_NAMES, QUEUE_CONFIG } from './config';
 import {
@@ -102,7 +102,7 @@ async function checkIdempotency(
 
     if (!error && data) {
       // Return existing job to caller
-      return queue.getJob(data.id);
+      return (await queue.getJob(data.id)) ?? null;
     }
   } catch (error) {
     // Error is expected if job doesn't exist
@@ -124,6 +124,7 @@ export async function enqueueEmail(
 
   const queue = getQueue(QUEUE_NAMES.EMAIL);
   const correlationId = options?.correlationId || generateCorrelationId();
+  const userId = data.userId;
 
   // Check idempotency
   if (options?.idempotencyKey) {
@@ -161,7 +162,7 @@ export async function enqueueEmail(
     QUEUE_NAMES.EMAIL,
     'email',
     data,
-    data.userId,
+    userId,
     correlationId,
     options?.idempotencyKey
   );
@@ -189,6 +190,7 @@ export async function enqueueFileProcessing(
 
   const queue = getQueue(QUEUE_NAMES.FILE_PROCESSING);
   const correlationId = options?.correlationId || generateCorrelationId();
+  const userId = data.userId;
 
   if (options?.idempotencyKey) {
     const existingJob = await checkIdempotency(
@@ -220,7 +222,7 @@ export async function enqueueFileProcessing(
     QUEUE_NAMES.FILE_PROCESSING,
     'file_processing',
     data,
-    data.userId,
+    userId,
     correlationId,
     options?.idempotencyKey
   );
@@ -241,6 +243,7 @@ export async function enqueueDataExport(
 
   const queue = getQueue(QUEUE_NAMES.DATA_EXPORT);
   const correlationId = options?.correlationId || generateCorrelationId();
+  const userId = data.userId;
 
   if (options?.idempotencyKey) {
     const existingJob = await checkIdempotency(
@@ -268,7 +271,7 @@ export async function enqueueDataExport(
     QUEUE_NAMES.DATA_EXPORT,
     'data_export',
     data,
-    data.userId,
+    userId,
     correlationId,
     options?.idempotencyKey
   );
@@ -289,6 +292,7 @@ export async function enqueueWebhook(
 
   const queue = getQueue(QUEUE_NAMES.WEBHOOK);
   const correlationId = options?.correlationId || generateCorrelationId();
+  const userId = data.userId;
 
   // Webhooks should be idempotent by default
   if (!options?.idempotencyKey) {
@@ -318,7 +322,7 @@ export async function enqueueWebhook(
     QUEUE_NAMES.WEBHOOK,
     'webhook',
     data,
-    data.userId,
+    userId,
     correlationId,
     options?.idempotencyKey
   );

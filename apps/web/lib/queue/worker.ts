@@ -8,13 +8,13 @@
  */
 
 import { Worker } from 'bullmq';
-import { getRedisConnection, getQueue, getQueueEvents, shutdownQueues } from './client';
+import { getRedisConnection, shutdownQueues } from './client';
 import { QUEUE_NAMES, QUEUE_CONFIG, QUEUE_PREFIX } from './config';
 import { validateRedisConnection } from './config';
 import { processEmailJob } from './workers/email-worker';
 import { processFileJob } from './workers/file-worker';
 import { processWebhookJob } from './workers/webhook-worker';
-import { getLogger, createContextLogger } from './observability/logger';
+import { getLogger } from './observability/logger';
 import { checkWorkerHealth } from './health';
 
 let workers: Worker[] = [];
@@ -33,11 +33,9 @@ function createWorker(
     connection: getRedisConnection(),
     prefix: QUEUE_PREFIX,
     concurrency: QUEUE_CONFIG.concurrency,
-    settings: {
-      maxStalledCount: QUEUE_CONFIG.maxStalledCount,
-      lockDuration: QUEUE_CONFIG.lockDuration,
-      lockRenewTime: QUEUE_CONFIG.lockRenewTime,
-    },
+    maxStalledCount: QUEUE_CONFIG.maxStalledCount,
+    lockDuration: QUEUE_CONFIG.lockDuration,
+    lockRenewTime: QUEUE_CONFIG.lockRenewTime,
   });
 
   // Event listeners

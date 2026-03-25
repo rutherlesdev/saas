@@ -60,7 +60,7 @@ export class MetricsCollector {
       .sort((a, b) => a.duration - b.duration);
     
     const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-    return sorted[Math.max(0, index)].duration;
+    return sorted[Math.max(0, index)]?.duration ?? 0;
   }
 
   getMetrics() {

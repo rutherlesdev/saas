@@ -5,7 +5,7 @@
  * with proper connection pooling and lifecycle management.
  */
 
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Queue, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
 import { REDIS_CONFIG, QUEUE_NAMES, QUEUE_PREFIX } from './config';
 
@@ -59,11 +59,6 @@ export function getQueue(queueName: QueueName): Queue {
     const queue = new Queue(queueName, {
       connection: getRedisConnection(),
       prefix: QUEUE_PREFIX,
-      settings: {
-        maxStalledCount: 2,
-        lockDuration: 30000,
-        lockRenewTime: 15000,
-      },
     });
     
     queues.set(queueName, queue);
@@ -92,7 +87,7 @@ export function getQueueEvents(queueName: QueueName): QueueEvents {
  * Graceful shutdown of all connections
  */
 export async function shutdownQueues(): Promise<void> {
-  const shutdownPromises: Promise<void>[] = [];
+  const shutdownPromises: Promise<unknown>[] = [];
   
   // Close all queues
   for (const queue of queues.values()) {

@@ -11,12 +11,12 @@ import { getLogger } from '@/lib/queue/observability/logger';
 const logger = getLogger();
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const jobId = params.id;
+  const { id: jobId } = await params;
 
+  try {
     const { data: job, error } = await supabaseAdmin
       .from('jobs')
       .select('*')
@@ -43,7 +43,7 @@ export async function GET(
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error({ error: errorMessage, jobId: params.id }, 'Failed to get job status');
+    logger.error({ error: errorMessage, jobId }, 'Failed to get job status');
 
     return NextResponse.json(
       { error: errorMessage },

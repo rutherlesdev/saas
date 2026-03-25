@@ -94,7 +94,7 @@ class WebhookError extends Error {
 
 async function deliverWebhook(data: WebhookJobData) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), data.timeout);
+  const timeoutId = setTimeout(() => controller.abort(), data.timeout ?? 30000);
 
   try {
     const response = await fetch(data.url, {
@@ -133,5 +133,7 @@ async function deliverWebhook(data: WebhookJobData) {
     throw new Error(
       error instanceof Error ? error.message : 'Webhook delivery failed'
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

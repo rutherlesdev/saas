@@ -7,10 +7,14 @@
 
 import { z } from 'zod';
 
+const JobCorrelationSchema = z.object({
+  correlationId: z.string().optional(),
+});
+
 /**
  * Email Job - for sending transactional emails
  */
-export const EmailJobDataSchema = z.object({
+export const EmailJobDataSchema = JobCorrelationSchema.extend({
   to: z.string().email('Invalid email address'),
   subject: z.string().min(1),
   templateId: z.string(),
@@ -19,7 +23,7 @@ export const EmailJobDataSchema = z.object({
   priority: z.enum(['high', 'normal', 'low']).optional().default('normal'),
 });
 
-export type EmailJobData = z.infer<typeof EmailJobDataSchema>;
+export type EmailJobData = z.input<typeof EmailJobDataSchema>;
 
 export interface EmailJobResult {
   messageId: string;
@@ -30,7 +34,7 @@ export interface EmailJobResult {
 /**
  * File Processing Job - for async file uploads/processing
  */
-export const FileProcessingJobDataSchema = z.object({
+export const FileProcessingJobDataSchema = JobCorrelationSchema.extend({
   fileId: z.string(),
   userId: z.string(),
   bucket: z.string(),
@@ -40,7 +44,7 @@ export const FileProcessingJobDataSchema = z.object({
   options: z.record(z.any()).optional(),
 });
 
-export type FileProcessingJobData = z.infer<
+export type FileProcessingJobData = z.input<
   typeof FileProcessingJobDataSchema
 >;
 
@@ -54,7 +58,7 @@ export interface FileProcessingJobResult {
 /**
  * Data Export Job - for generating reports/exports
  */
-export const DataExportJobDataSchema = z.object({
+export const DataExportJobDataSchema = JobCorrelationSchema.extend({
   userId: z.string(),
   exportType: z.enum(['csv', 'pdf', 'json']),
   dataType: z.string(),
@@ -62,7 +66,7 @@ export const DataExportJobDataSchema = z.object({
   batchSize: z.number().optional().default(1000),
 });
 
-export type DataExportJobData = z.infer<typeof DataExportJobDataSchema>;
+export type DataExportJobData = z.input<typeof DataExportJobDataSchema>;
 
 export interface DataExportJobResult {
   exportId: string;
@@ -74,7 +78,7 @@ export interface DataExportJobResult {
 /**
  * Webhook Job - for reliable webhook deliveries with retries
  */
-export const WebhookJobDataSchema = z.object({
+export const WebhookJobDataSchema = JobCorrelationSchema.extend({
   webhookId: z.string(),
   url: z.string().url(),
   event: z.string(),
@@ -83,7 +87,7 @@ export const WebhookJobDataSchema = z.object({
   timeout: z.number().optional().default(30000),
 });
 
-export type WebhookJobData = z.infer<typeof WebhookJobDataSchema>;
+export type WebhookJobData = z.input<typeof WebhookJobDataSchema>;
 
 export interface WebhookJobResult {
   webhookId: string;
@@ -95,13 +99,13 @@ export interface WebhookJobResult {
 /**
  * Cleanup Job - for periodic maintenance tasks
  */
-export const CleanupJobDataSchema = z.object({
+export const CleanupJobDataSchema = JobCorrelationSchema.extend({
   cleanupType: z.enum(['expired_sessions', 'old_logs', 'temp_files']),
   retentionDays: z.number().optional().default(30),
   dryRun: z.boolean().optional().default(false),
 });
 
-export type CleanupJobData = z.infer<typeof CleanupJobDataSchema>;
+export type CleanupJobData = z.input<typeof CleanupJobDataSchema>;
 
 export interface CleanupJobResult {
   cleanupType: string;
